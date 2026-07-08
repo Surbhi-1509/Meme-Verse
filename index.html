@@ -1,0 +1,188 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Meme Verse</title>
+
+    <!-- Applied before the stylesheet paints anything, so a saved "light"
+         preference doesn't flash dark first. Dark stays the default if
+         nothing is saved yet. -->
+    <script>
+        (function () {
+            try {
+                if (localStorage.getItem('gestureMemeTheme') === 'light') {
+                    document.documentElement.setAttribute('data-theme', 'light');
+                }
+            } catch (e) { /* ignore storage errors, default (dark) applies */ }
+        })();
+    </script>
+
+    <link rel="stylesheet" href="style.css">
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <!-- "Bangers" is the classic bold comic/meme-caption font — used for the
+         title, section headings and pill labels to give the whole page a
+         meme-culture look. Stat numbers stay on the clean sans-serif so
+         they're still easy to read at a glance. -->
+    <link href="https://fonts.googleapis.com/css2?family=Bangers&display=swap" rel="stylesheet">
+
+    <!-- defer: lets the browser parse the rest of the page without waiting
+         on these external scripts, while still guaranteeing they run, in
+         this order, before the app's own deferred scripts at the bottom of
+         <body> (which also use defer, so relative order is preserved). -->
+    <script src="https://cdn.jsdelivr.net/npm/@mediapipe/camera_utils/camera_utils.js" crossorigin="anonymous" defer></script>
+    <script src="https://cdn.jsdelivr.net/npm/@mediapipe/drawing_utils/drawing_utils.js" crossorigin="anonymous" defer></script>
+    <script src="https://cdn.jsdelivr.net/npm/@mediapipe/hands/hands.js" crossorigin="anonymous" defer></script>
+    <script src="https://cdn.jsdelivr.net/npm/@mediapipe/face_mesh/face_mesh.js" crossorigin="anonymous" defer></script>
+</head>
+<body>
+
+    <button id="theme_toggle" class="theme-toggle" type="button" aria-label="Toggle light and dark theme" aria-pressed="false">
+        <span class="theme-toggle-icon">🌙</span>
+    </button>
+
+    <noscript>
+        <div class="noscript-message">
+            ⚠️ This app needs JavaScript to run gesture and facial expression
+            detection. Please enable JavaScript in your browser to use the
+            Gesture &amp; Expression Meme Generator.
+        </div>
+    </noscript>
+
+    <!-- Full-screen loading experience, shown before the app is ready.
+         Removed/faded out once camera + models + assets have all loaded. -->
+    <div id="loading_screen" class="loading-screen">
+        <div class="loading-logo">🎭</div>
+        <div id="loading_step_text" class="loading-step">📷 Initializing Camera...</div>
+        <div class="loading-bar-track">
+            <div id="loading_bar_fill" class="loading-bar-fill"></div>
+        </div>
+        <div id="loading_percent" class="loading-percent">0%</div>
+    </div>
+
+    <main class="container">
+
+        <header class="app-header">
+            <h1>🎭 Meme Verse</h1>
+            <p class="tagline">Real-time hand gesture &amp; facial expression recognition</p>
+        </header>
+
+        <div class="main-row">
+            <!-- Left: live webcam feed, dressed up as the same cartoon TV set
+                 used on the meme side. The frame is purely decorative
+                 CSS/markup around the existing .video-wrapper "screen" —
+                 none of the camera/detection logic below changed. -->
+            <div class="cam-tv">
+                <div class="meme-tv-antenna" aria-hidden="true">
+                    <span></span>
+                    <span></span>
+                </div>
+                <div class="meme-tv-knobs" aria-hidden="true">
+                    <span class="meme-tv-knob"></span>
+                    <span class="meme-tv-knob"></span>
+                </div>
+
+                <div class="video-wrapper">
+                    <video id="webcam" autoplay playsinline></video>
+                    <canvas id="output_canvas"></canvas>
+                    <div class="webcam-live-badge" aria-hidden="true">
+                        <span class="webcam-live-dot"></span>LIVE
+                    </div>
+                    <div class="webcam-cam-icon" aria-hidden="true">📷</div>
+                    <div id="debug_readout" class="debug-readout"></div>
+                </div>
+
+                <div class="meme-tv-feet" aria-hidden="true">
+                    <span></span>
+                    <span></span>
+                </div>
+            </div>
+
+            <div class="arrow">&rarr;</div>
+
+            <!-- Right: meme card that continuously reflects the current pose,
+                 now dressed up as a cartoon TV set. The frame is purely
+                 decorative CSS/markup around the existing #meme_panel/#meme_img
+                 — none of the meme logic below changed. -->
+            <div class="meme-tv">
+                <div class="meme-tv-antenna" aria-hidden="true">
+                    <span></span>
+                    <span></span>
+                </div>
+                <div class="meme-tv-knobs" aria-hidden="true">
+                    <span class="meme-tv-knob"></span>
+                    <span class="meme-tv-knob"></span>
+                </div>
+
+                <div id="meme_panel" class="meme-panel">
+                    <img id="meme_img" src="assets/memes/default.jpg" alt="Meme">
+                    <div class="meme-tv-glare" aria-hidden="true"></div>
+                    <div class="meme-tv-power-flash" aria-hidden="true"></div>
+                </div>
+
+                <div class="meme-tv-feet" aria-hidden="true">
+                    <span></span>
+                    <span></span>
+                </div>
+            </div>
+        </div>
+
+        <section class="pill-row" aria-label="Hand gesture indicators">
+            <div class="pill-row-label">👋 HAND GESTURES</div>
+            <div class="pills">
+                <button class="pill" data-category="thumbs_up" aria-label="Thumbs Up gesture" aria-pressed="false">💪 THUMBS UP</button>
+                <button class="pill" data-category="fist" aria-label="Fist gesture" aria-pressed="false">✊ FIST</button>
+                <button class="pill" data-category="ok" aria-label="OK Sign gesture" aria-pressed="false">👌 OK SIGN</button>
+                <button class="pill" data-category="shh" aria-label="Shh gesture" aria-pressed="false">🤫 SHH</button>
+                <button class="pill" data-category="peace" aria-label="Peace gesture" aria-pressed="false">✌️ PEACE</button>
+                <button class="pill" data-category="rock" aria-label="Rock gesture" aria-pressed="false">🤟 ROCK</button>
+                <button class="pill" data-category="call_me" aria-label="Call Me gesture" aria-pressed="false">🤙 CALL ME</button>
+            </div>
+        </section>
+
+        <section class="pill-row" aria-label="Facial expression indicators">
+            <div class="pill-row-label">🙂 FACE EXPRESSIONS</div>
+            <div class="pills">
+                <button class="pill" data-category="smile" aria-label="Smile expression" aria-pressed="false">😊 SMILE</button>
+                <button class="pill" data-category="tongue" aria-label="Tongue Out expression" aria-pressed="false">😝 TONGUE OUT</button>
+                <button class="pill" data-category="angry" aria-label="Angry expression" aria-pressed="false">😠 ANGRY</button>
+            </div>
+        </section>
+
+        <!-- Live statistics — updates the moment a new gesture/expression is detected -->
+        <section class="stats-card" aria-label="Live statistics">
+            <div class="stats-card-title">📊 Live Statistics</div>
+            <div class="stats-grid">
+                <div class="stat-item">
+                    <div id="stat_total_gestures" class="stat-value">0</div>
+                    <div class="stat-label">Total Gestures Detected</div>
+                </div>
+                <div class="stat-item">
+                    <div id="stat_total_expressions" class="stat-value">0</div>
+                    <div class="stat-label">Total Expressions Detected</div>
+                </div>
+                <div class="stat-item">
+                    <div id="stat_top_gesture" class="stat-value stat-value-text">—</div>
+                    <div class="stat-label">Most Used Gesture</div>
+                </div>
+                <div class="stat-item">
+                    <div id="stat_top_expression" class="stat-value stat-value-text">—</div>
+                    <div class="stat-label">Most Used Expression</div>
+                </div>
+                <div class="stat-item">
+                    <div id="stat_avg_fps" class="stat-value stat-value-text">0.0</div>
+                    <div class="stat-label">Average FPS</div>
+                </div>
+            </div>
+            <button id="reset_stats_btn" type="button" class="reset-stats-btn">↺ Reset Statistics</button>
+        </section>
+
+    </main>
+
+    <script src="gestures.js" defer></script>
+    <script src="expressions.js" defer></script>
+    <script src="memeManager.js" defer></script>
+    <script src="script.js" defer></script>
+</body>
+</html>

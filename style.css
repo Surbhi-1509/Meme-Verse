@@ -1,0 +1,751 @@
+:root {
+    --bg-color: #0b0b0f;
+    --panel-bg: rgba(255, 255, 255, 0.04);
+    --subtle-bg: rgba(255, 255, 255, 0.03);
+    --card-border: rgba(255, 255, 255, 0.1);
+    --text-color: #ffffff;
+    --muted-text: #9a9aa5;
+    --accent-color: #ffcc33;
+    --pink: #ff5da2;
+    --green: #33e28a;
+
+    /* Classic bold comic/meme-caption font. Used for the title, section
+       headings and pill labels to give the page a genuine meme-culture
+       look; stat numbers and body copy stay on the clean sans-serif so
+       they're still easy to scan. */
+    --font-display: 'Bangers', 'Segoe UI', cursive;
+
+    /* Shadow tokens — values here match exactly what was previously
+       hardcoded on each element, so Dark Mode's rendered output is
+       byte-for-byte unchanged. Only the Light Mode override below gets
+       different (softer, "modern SaaS card") shadow values. */
+    --shadow-card: 0 10px 30px rgba(0, 0, 0, 0.5);
+    --shadow-panel: 0 10px 30px rgba(0, 0, 0, 0.35);
+    --shadow-fab: 0 6px 18px rgba(0, 0, 0, 0.3);
+    --shadow-fab-hover: 0 8px 22px rgba(0, 0, 0, 0.35);
+}
+
+/* ---------- Light Mode ----------
+   Dark (the :root defaults above) stays the default whenever this
+   attribute isn't present — untouched, byte-for-byte, by anything below.
+   Toggled via JS in script.js. Redesigned to feel like a modern web app
+   (Linear/Vercel/Notion-style): soft off-white page background, true white
+   cards with soft layered shadows instead of a semi-transparent tint, and
+   a slightly deeper accent palette tuned for contrast on a light surface. */
+:root[data-theme="light"] {
+    --bg-color: #f4f5f7;              /* soft off-white, not stark white */
+    --panel-bg: #ffffff;              /* real white cards, not a faint tint */
+    --subtle-bg: #f3f4f6;             /* nested "card within a card" tone */
+    --card-border: #e5e7eb;
+    --text-color: #14161c;
+    --muted-text: #6b7280;
+    --accent-color: #c9890a;
+    --pink: #d6337c;
+    --green: #1f9e63;
+
+    --shadow-card: 0 12px 28px rgba(16, 24, 40, 0.10), 0 2px 8px rgba(16, 24, 40, 0.05);
+    --shadow-panel: 0 10px 24px rgba(16, 24, 40, 0.08), 0 2px 6px rgba(16, 24, 40, 0.04);
+    --shadow-fab: 0 4px 14px rgba(16, 24, 40, 0.14);
+    --shadow-fab-hover: 0 6px 18px rgba(16, 24, 40, 0.18);
+}
+
+* { box-sizing: border-box; }
+
+/* Smooth cross-fade of colors whenever the theme switches, applied broadly
+   but only to color-related properties so it never interferes with the
+   existing transform/opacity animations (meme swap, loading bar, pills, etc). */
+html, body, .container, .video-wrapper, .meme-panel, .pill, .pill-row-label,
+.stats-card, .stat-item, .stat-label, .loading-bar-track, .debug-readout,
+.noscript-message, .theme-toggle, .reset-stats-btn {
+    transition: background-color 0.4s ease, color 0.4s ease,
+                border-color 0.4s ease, box-shadow 0.4s ease;
+}
+
+/* ---------- No-JS fallback ---------- */
+.noscript-message {
+    max-width: 600px;
+    margin: 60px auto;
+    padding: 20px 24px;
+    background: rgba(255, 93, 162, 0.08);
+    border: 1px solid var(--pink);
+    border-radius: 12px;
+    color: var(--text-color);
+    font-size: 0.95rem;
+    line-height: 1.5;
+    text-align: center;
+}
+
+body {
+    margin: 0;
+    padding: 24px 12px 48px;
+    background-color: var(--bg-color);
+    /* Comic-style halftone dots + soft brand-colored glow — the classic
+       "meme template" background texture, layered under everything else. */
+    background-image:
+        radial-gradient(circle at 12% 8%, rgba(255, 93, 162, 0.14), transparent 42%),
+        radial-gradient(circle at 88% 12%, rgba(255, 204, 51, 0.12), transparent 40%),
+        radial-gradient(circle, rgba(255, 255, 255, 0.05) 1.5px, transparent 1.5px);
+    background-size: auto, auto, 22px 22px;
+    background-attachment: fixed;
+    color: var(--text-color);
+    font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+    min-height: 100vh;
+}
+
+:root[data-theme="light"] body {
+    background-image:
+        radial-gradient(circle at 12% 8%, rgba(214, 51, 124, 0.08), transparent 42%),
+        radial-gradient(circle at 88% 12%, rgba(201, 137, 10, 0.08), transparent 40%),
+        radial-gradient(circle, rgba(0, 0, 0, 0.045) 1.5px, transparent 1.5px);
+    background-size: auto, auto, 22px 22px;
+}
+
+.container {
+    max-width: 1100px;
+    margin: 0 auto;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    /* One shared gap drives the rhythm between every major section instead
+       of each one carrying its own ad-hoc margin-top. */
+    gap: 28px;
+}
+
+/* ---------- Header ---------- */
+.app-header {
+    text-align: center;
+}
+
+.app-header h1 {
+    margin: 0;
+    font-family: var(--font-display);
+    font-size: 3rem;
+    font-weight: 400;
+    letter-spacing: 1px;
+    line-height: 1;
+    color: var(--accent-color);
+    transform: rotate(-2deg);
+    display: inline-block;
+    /* Classic meme-caption outline: a bold colored fill with a hard black
+       stroke around every glyph, built from layered text-shadows so it
+       renders consistently across browsers (not just WebKit). */
+    text-shadow:
+        -2px -2px 0 #000,
+         2px -2px 0 #000,
+        -2px  2px 0 #000,
+         2px  2px 0 #000,
+         0    4px 0 rgba(0, 0, 0, 0.25);
+}
+
+:root[data-theme="light"] .app-header h1 {
+    text-shadow:
+        -2px -2px 0 #14161c,
+         2px -2px 0 #14161c,
+        -2px  2px 0 #14161c,
+         2px  2px 0 #14161c,
+         0    4px 0 rgba(0, 0, 0, 0.15);
+}
+
+.tagline {
+    margin: 6px 0 0;
+    color: var(--muted-text);
+    font-size: 0.95rem;
+}
+
+/* ---------- Main row: webcam -> arrow -> meme card ---------- */
+.main-row {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 20px;
+    flex-wrap: wrap;
+    width: 100%;
+}
+
+/* Outer TV frame for the webcam side — same treatment as .meme-tv. */
+.cam-tv {
+    position: relative;
+    width: 480px;
+    max-width: 44vw;
+    aspect-ratio: 4/3;
+    box-sizing: border-box;
+    display: flex;
+    padding: 20px 24px 30px;
+    background: linear-gradient(160deg, #a06a3d 0%, #7d5029 55%, #5f3c1d 100%);
+    border: 3px solid #4a2f18;
+    border-radius: 28px;
+    box-shadow: var(--shadow-card), inset 0 2px 3px rgba(255, 255, 255, 0.2);
+}
+
+/* The screen itself — still the same #webcam/#output_canvas used by
+   script.js, only its sizing/decoration changed to fit inside the frame. */
+.video-wrapper {
+    position: relative;
+    flex: 1;
+    width: 100%;
+    height: 100%;
+    background: #000;
+    border-radius: 14px;
+    overflow: hidden;
+    box-shadow: inset 0 0 16px rgba(0, 0, 0, 0.7); /* recessed screen look, matches .meme-panel */
+    transition: box-shadow 0.6s ease, border-color 0.4s ease;
+}
+
+/* Slight ambient glow once the camera is actually running — toggled by
+   script.js adding this class right after camera.start() succeeds, purely
+   visual and unrelated to the camera/detection logic itself. */
+.video-wrapper.camera-active {
+    border-color: rgba(255, 204, 51, 0.4);
+    box-shadow: var(--shadow-card), 0 0 22px rgba(255, 204, 51, 0.18), 0 0 0 1px rgba(255, 255, 255, 0.04) inset;
+}
+
+:root[data-theme="light"] .video-wrapper.camera-active {
+    border-color: rgba(201, 137, 10, 0.35);
+    box-shadow: var(--shadow-card), 0 0 22px rgba(201, 137, 10, 0.16), 0 0 0 1px rgba(255, 255, 255, 0.5) inset;
+}
+
+@media (max-width: 850px) {
+    .cam-tv, .meme-tv { max-width: 90vw; width: 90vw; }
+    .arrow { transform: rotate(90deg); }
+}
+
+video, canvas {
+    position: absolute;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    transform: scaleX(-1); /* mirror, like a selfie camera */
+    object-fit: cover;
+}
+
+.arrow {
+    font-size: 2rem;
+    color: var(--accent-color);
+    flex-shrink: 0;
+}
+
+/* Small monospace debug readout, bottom-left of the webcam view */
+.debug-readout {
+    position: absolute;
+    bottom: 8px;
+    left: 10px;
+    right: 10px;
+    z-index: 10;
+    font-family: 'Consolas', 'Courier New', monospace;
+    font-size: 0.65rem;
+    line-height: 1.3;
+    white-space: normal;
+    color: rgba(255, 255, 255, 0.55);
+    letter-spacing: 0.5px;
+    pointer-events: none;
+}
+
+/* ---------- Webcam LIVE badge + camera icon ---------- */
+.webcam-live-badge {
+    position: absolute;
+    top: 12px;
+    left: 12px;
+    z-index: 11;
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    padding: 5px 10px 5px 8px;
+    background: rgba(0, 0, 0, 0.55);
+    backdrop-filter: blur(4px);
+    border: 1px solid rgba(255, 255, 255, 0.15);
+    border-radius: 999px;
+    color: #ffffff;
+    font-size: 0.7rem;
+    font-weight: 700;
+    letter-spacing: 0.8px;
+    pointer-events: none;
+}
+
+.webcam-live-dot {
+    width: 7px;
+    height: 7px;
+    border-radius: 50%;
+    background: var(--pink);
+    box-shadow: 0 0 6px var(--pink);
+    animation: webcam-live-pulse 1.6s ease-in-out infinite;
+}
+
+@keyframes webcam-live-pulse {
+    0%, 100% { opacity: 1; transform: scale(1); }
+    50% { opacity: 0.45; transform: scale(0.8); }
+}
+
+.webcam-cam-icon {
+    position: absolute;
+    top: 12px;
+    right: 12px;
+    z-index: 11;
+    width: 28px;
+    height: 28px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 0.85rem;
+    background: rgba(0, 0, 0, 0.55);
+    backdrop-filter: blur(4px);
+    border: 1px solid rgba(255, 255, 255, 0.15);
+    border-radius: 50%;
+    pointer-events: none;
+}
+
+/* ---------- Cartoon TV frame around the meme ---------- */
+.meme-tv {
+    position: relative;
+    width: 480px;
+    max-width: 44vw;
+    aspect-ratio: 4/3;
+    box-sizing: border-box;
+    display: flex;
+    padding: 20px 24px 30px;
+    background: linear-gradient(160deg, #a06a3d 0%, #7d5029 55%, #5f3c1d 100%);
+    border: 3px solid #4a2f18;
+    border-radius: 28px;
+    box-shadow: var(--shadow-card), inset 0 2px 3px rgba(255, 255, 255, 0.2);
+}
+
+/* The screen itself: fills the TV frame's interior completely (requirement
+   2). It's still the same #meme_panel used by memeManager.js/script.js —
+   only its sizing/decoration changed, not its id, so nothing in the meme
+   or gesture logic needed to change. */
+.meme-panel {
+    position: relative;
+    flex: 1;
+    width: 100%;
+    height: 100%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    border-radius: 14px;
+    overflow: hidden;
+    background: #000;
+    box-shadow: inset 0 0 16px rgba(0, 0, 0, 0.7); /* recessed screen look */
+}
+
+/* Antenna: two thin angled "rabbit ears" above the frame */
+.meme-tv-antenna {
+    position: absolute;
+    top: -22px;
+    left: 50%;
+    transform: translateX(-50%);
+    width: 70px;
+    height: 26px;
+    pointer-events: none;
+}
+
+.meme-tv-antenna span {
+    position: absolute;
+    bottom: 0;
+    left: 50%;
+    width: 3px;
+    height: 26px;
+    background: #4a2f18;
+    border-radius: 2px;
+    transform-origin: bottom center;
+}
+
+.meme-tv-antenna span:first-child { transform: translateX(-2px) rotate(-24deg); }
+.meme-tv-antenna span:last-child { transform: translateX(2px) rotate(24deg); }
+
+/* Knobs: a couple of small dials on the top-right of the bezel */
+.meme-tv-knobs {
+    position: absolute;
+    top: 8px;
+    right: 10px;
+    display: flex;
+    gap: 6px;
+    z-index: 2;
+}
+
+.meme-tv-knob {
+    width: 10px;
+    height: 10px;
+    border-radius: 50%;
+    background: radial-gradient(circle at 35% 35%, #e8c99a, #8a5a34 75%);
+    box-shadow: 0 1px 2px rgba(0, 0, 0, 0.4);
+}
+
+/* Feet: two small trapezoid legs under the frame */
+.meme-tv-feet {
+    position: absolute;
+    bottom: -14px;
+    left: 50%;
+    transform: translateX(-50%);
+    width: 70%;
+    display: flex;
+    justify-content: space-between;
+    pointer-events: none;
+}
+
+.meme-tv-feet span {
+    width: 22px;
+    height: 14px;
+    background: #4a2f18;
+    clip-path: polygon(20% 0, 80% 0, 100% 100%, 0 100%);
+}
+
+/* Subtle diagonal screen glare — purely decorative, sits above the meme
+   image but never affects its resolution/quality since it's just a CSS
+   gradient layer, not something drawn onto the image itself. */
+.meme-tv-glare {
+    position: absolute;
+    inset: 0;
+    background: linear-gradient(115deg, rgba(255, 255, 255, 0.16) 0%, rgba(255, 255, 255, 0) 30%);
+    pointer-events: none;
+}
+
+/* Small "power-on" flash: a bright line that snaps open vertically then
+   fades, like an old CRT switching on. Triggered by memeManager.js adding
+   the .playing class each time a genuinely new meme appears (same
+   anti-flicker guard as the existing fade/zoom/bounce animation, so it
+   never replays for repeated/unchanged detections). */
+.meme-tv-power-flash {
+    position: absolute;
+    inset: 0;
+    background: #fbfbf5;
+    opacity: 0;
+    transform: scaleY(0.02);
+    pointer-events: none;
+}
+
+.meme-tv-power-flash.playing {
+    animation: meme-tv-power-on 480ms ease-out;
+}
+
+@keyframes meme-tv-power-on {
+    0%   { transform: scaleY(0.02); opacity: 0.95; }
+    35%  { transform: scaleY(0.02); opacity: 1; }
+    65%  { transform: scaleY(1); opacity: 0.6; }
+    100% { transform: scaleY(1); opacity: 0; }
+}
+
+.meme-panel img {
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+    object-position: center;
+    border-radius: 16px;
+}
+
+/* Smooth fade+shrink when swapping away from the current meme */
+.meme-panel img.meme-exit {
+    animation: meme-fade-out 180ms ease forwards;
+}
+
+/* Fade in + slight zoom overshoot + settle — a small "bounce" as it lands */
+.meme-panel img.meme-enter {
+    animation: meme-fade-in-bounce 420ms cubic-bezier(0.34, 1.56, 0.64, 1) forwards;
+}
+
+@keyframes meme-fade-out {
+    from { opacity: 1; transform: scale(1); }
+    to   { opacity: 0; transform: scale(0.94); }
+}
+
+@keyframes meme-fade-in-bounce {
+    0%   { opacity: 0; transform: scale(0.82); }
+    55%  { opacity: 1; transform: scale(1.06); }
+    100% { opacity: 1; transform: scale(1); }
+}
+
+/* ---------- Gesture / expression pill rows ---------- */
+.pill-row {
+    width: 100%;
+    padding: 20px 24px;
+    background: var(--panel-bg);
+    border: 3px solid var(--card-border);
+    border-radius: 18px;
+    /* Hard-offset "sticker" shadow instead of a soft blur — reads as a
+       comic/meme card rather than a generic app panel. */
+    box-shadow: 6px 6px 0 rgba(0, 0, 0, 0.35);
+    text-align: center;
+    transition: background-color 0.4s ease, border-color 0.4s ease, box-shadow 0.4s ease;
+}
+
+.pill-row-label {
+    font-family: var(--font-display);
+    font-size: 1.15rem;
+    font-weight: 400;
+    color: var(--accent-color);
+    letter-spacing: 1.5px;
+    margin-bottom: 12px;
+}
+
+.pills {
+    display: flex;
+    flex-wrap: wrap;
+    justify-content: center;
+    gap: 10px;
+}
+
+.pill {
+    font-family: var(--font-display);
+    font-weight: 400;
+    font-size: 1rem;
+    letter-spacing: 0.5px;
+    color: var(--text-color);
+    background: var(--panel-bg);
+    border: 2px solid var(--card-border);
+    border-radius: 999px;
+    padding: 8px 18px;
+    cursor: default;
+    user-select: none;
+    transition: border-color 0.2s ease, color 0.2s ease, transform 0.2s ease, box-shadow 0.2s ease;
+}
+
+.pill.active {
+    color: #14161c;
+    background: var(--accent-color);
+    border-color: var(--accent-color);
+    box-shadow: 3px 3px 0 rgba(0, 0, 0, 0.35);
+    transform: translateY(-2px) rotate(-1deg);
+}
+
+/* ---------- Theme toggle ---------- */
+/* Fixed/floating so it overlays the page without affecting existing layout. */
+.theme-toggle {
+    position: fixed;
+    top: 16px;
+    right: 16px;
+    z-index: 500;
+    width: 44px;
+    height: 44px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    border-radius: 50%;
+    background: var(--panel-bg);
+    border: 1px solid var(--card-border);
+    color: var(--text-color);
+    cursor: pointer;
+    font-size: 1.2rem;
+    box-shadow: var(--shadow-fab);
+    transition: background-color 0.4s ease, border-color 0.4s ease,
+                transform 0.2s ease, box-shadow 0.2s ease;
+}
+
+.theme-toggle:hover {
+    transform: translateY(-2px) scale(1.05);
+    box-shadow: var(--shadow-fab-hover);
+}
+
+.theme-toggle:active {
+    transform: translateY(0) scale(0.97);
+}
+
+.theme-toggle-icon {
+    display: inline-block;
+    transition: transform 0.4s ease;
+}
+
+/* ---------- Live statistics card ---------- */
+.stats-card {
+    width: 100%;
+    padding: 20px 24px;
+    background: var(--panel-bg);
+    border: 3px solid var(--card-border);
+    border-radius: 18px;
+    box-shadow: 6px 6px 0 rgba(0, 0, 0, 0.35);
+}
+
+.stats-card-title {
+    font-family: var(--font-display);
+    font-size: 1.25rem;
+    font-weight: 400;
+    letter-spacing: 1px;
+    color: var(--accent-color);
+    text-align: center;
+    margin-bottom: 16px;
+}
+
+.stats-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(140px, 1fr));
+    gap: 16px;
+}
+
+.stat-item {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 4px;
+    padding: 14px 10px;
+    background: var(--subtle-bg);
+    border: 1px solid var(--card-border);
+    border-radius: 12px;
+    text-align: center;
+    transition: background-color 0.4s ease, border-color 0.4s ease;
+}
+
+.stat-value {
+    font-size: 1.8rem;
+    font-weight: 800;
+    background: linear-gradient(90deg, var(--pink), var(--accent-color));
+    -webkit-background-clip: text;
+    background-clip: text;
+    color: transparent;
+    transition: opacity 0.2s ease;
+}
+
+.stat-value-text {
+    font-size: 1.1rem;
+    letter-spacing: 0.3px;
+}
+
+.stat-label {
+    font-size: 0.7rem;
+    color: var(--muted-text);
+    letter-spacing: 0.6px;
+    text-transform: uppercase;
+}
+
+.reset-stats-btn {
+    display: block;
+    margin: 18px auto 0;
+    font: inherit;
+    font-weight: 600;
+    font-size: 0.8rem;
+    letter-spacing: 0.3px;
+    color: var(--pink);
+    background: transparent;
+    border: 1px solid var(--pink);
+    border-radius: 999px;
+    padding: 8px 18px;
+    cursor: pointer;
+    transition: background-color 0.2s ease, color 0.2s ease, transform 0.15s ease;
+}
+
+.reset-stats-btn:hover {
+    background: var(--pink);
+    color: #1a1a1f;
+    transform: translateY(-1px);
+}
+
+.reset-stats-btn:active {
+    transform: translateY(0);
+}
+
+/* ---------- Loading screen ---------- */
+.loading-screen {
+    position: fixed;
+    inset: 0;
+    z-index: 1000;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: 22px;
+    background: radial-gradient(circle at 50% 40%, #17171f 0%, var(--bg-color) 70%);
+    opacity: 1;
+    visibility: visible;
+    transition: opacity 0.6s ease, visibility 0.6s ease;
+}
+
+.loading-screen.loading-hidden {
+    opacity: 0;
+    visibility: hidden;
+    pointer-events: none;
+}
+
+.loading-logo {
+    font-size: 3.2rem;
+    animation: loading-pulse 1.8s ease-in-out infinite;
+}
+
+@keyframes loading-pulse {
+    0%, 100% { transform: scale(1); opacity: 0.9; }
+    50% { transform: scale(1.08); opacity: 1; }
+}
+
+.loading-step {
+    font-size: 1rem;
+    font-weight: 600;
+    color: var(--text-color);
+    letter-spacing: 0.4px;
+    min-height: 1.4em;
+    text-align: center;
+    transition: opacity 0.25s ease;
+}
+
+.loading-bar-track {
+    width: min(360px, 80vw);
+    height: 8px;
+    border-radius: 999px;
+    background: var(--panel-bg);
+    border: 1px solid var(--card-border);
+    overflow: hidden;
+}
+
+.loading-bar-fill {
+    height: 100%;
+    width: 0%;
+    border-radius: 999px;
+    background: linear-gradient(90deg, var(--pink), var(--accent-color));
+    box-shadow: 0 0 12px rgba(255, 204, 51, 0.5);
+    transition: width 0.45s cubic-bezier(0.25, 0.8, 0.4, 1);
+}
+
+.loading-percent {
+    font-family: 'Consolas', 'Courier New', monospace;
+    font-size: 0.85rem;
+    color: var(--muted-text);
+    letter-spacing: 1px;
+}
+
+/* ---------- Main app fade-in (stays hidden until loading completes) ---------- */
+.container {
+    opacity: 0;
+    transition: opacity 0.7s ease;
+}
+
+.container.app-visible {
+    opacity: 1;
+}
+
+/* =====================================================================
+   Light Mode refinements — spacing, borders and button states tuned for
+   a light surface. Everything here is scoped under [data-theme="light"],
+   so none of it touches Dark Mode's existing rules or values above.
+   ===================================================================== */
+
+/* A touch more breathing room inside cards — feels closer to
+   Linear/Notion's airier spacing than the tighter dark-theme defaults. */
+:root[data-theme="light"] .stats-card {
+    padding: 28px 28px 26px;
+}
+
+:root[data-theme="light"] .stat-item {
+    padding: 16px 12px;
+    border-color: var(--card-border);
+}
+
+:root[data-theme="light"] .pill {
+    padding: 9px 18px;
+}
+
+/* Crisper, "chip focus ring" active state instead of the dark theme's
+   glow — a soft ring reads better against a white card than a bright
+   glow does, which is what dark mode uses to good effect on black. */
+:root[data-theme="light"] .pill.active {
+    box-shadow: 0 0 0 3px rgba(201, 137, 10, 0.16), 0 4px 10px rgba(16, 24, 40, 0.08);
+}
+
+/* Reset button gets a subtle lift on hover to match the rest of the
+   light theme's card-elevation language, on top of its existing color swap. */
+:root[data-theme="light"] .reset-stats-btn:hover {
+    box-shadow: 0 6px 16px rgba(214, 51, 124, 0.18);
+}
+
+/* The meme/webcam frame's own background (the letterboxing behind the
+   video/image, not the video itself) stays a neutral dark neutral rather
+   than pure black in light mode, so it doesn't feel like a jarring hole
+   in an otherwise light page before the camera/meme has loaded. */
+:root[data-theme="light"] .video-wrapper,
+:root[data-theme="light"] .meme-panel {
+    background: #1a1c22;
+}
